@@ -1,0 +1,277 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, PointElement, LineElement,
+  Title, Tooltip, Legend, Filler
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import MapView from './components/MapView.js';
+import NodeCard from './components/NodeCard.js';
+import AlertsPanel from './components/AlertsPanel.js';
+import StatsPanel from './components/StatsPanel.js';
+import './App.css';
+
+ChartJS.register(
+  CategoryScale, LinearScale, PointElement, LineElement,
+  Title, Tooltip, Legend, Filler
+);
+
+const API = process.env.REACT_APP_API_URL || '/api';
+const POLL_INTERVAL = 8000;
+
+function App() {
+  const [summary, setSummary] = useState([]);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [range, setRange] = useState('24h');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [loading, setLoading] = useState(true);
+  const [controlBusy, setControlBusy] = useState(false);
+
+  const fetchSummary = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/summary`);
+      setSummary(res.data);
+      if (!selectedNode && res.data.length > 0) {
+        setSelectedNode(res.data[0].nodeId);
+      }
+    } catch (err) {
+      console.error('Summary fetch error:', err.message);
+    }
+  }, [selectedNode]);
+
+  const fetchHistory = useCallback(async () => {
+    if (!selectedNode) return;
+    try {
+      const res = await axios.get(`${API}/nodes/${selectedNode}/data?range=${range}`);
+      setHistory(res.data);
+    } catch (err) {
+      console.error('History fetch error:', err.message);
+    }
+  }, [selectedNode, range]);
+
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/alerts?threshold=55`);
+      setAlerts(res.data);
+    } catch (err) {
+      console.error('Alerts fetch error:', err.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchSummary();
+      await fetchAlerts();
+      setLoading(false);
+    };
+
+    init();
+    const interval = setInterval(() => {
+      fetchSummary();
+      fetchAlerts();
+    }, POLL_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [fetchSummary, fetchAlerts]);
+
+  useEffect(() => {
+    fetchHistory();
+    const interval = setInterval(fetchHistory, POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchHistory]);
+
+  const getRiskColor = (riskOrProbability) => {
+    if (typeof riskOrProbability === 'number') {
+      if (riskOrProbability >= 80) return '#ff3b30';
+      if (riskOrProbability >= 60) return '#ff8c00';
+      if (riskOrProbability >= 35) return '#ffd60a';
+      return '#32d74b';
+    }
+
+    const risk = String(riskOrProbability || '').toUpperCase();
+    if (risk === 'CRITICAL') return '#ff3b30';
+    if (risk === 'HIGH') return '#ff8c00';
+    if (risk === 'MEDIUM') return '#ffd60a';
+    return '#32d74b';
+  };
+
+  const selectedNodeData = summary.find((n) => n.nodeId === selectedNode);
+
+  const sendControl = async ({ relayOn, buzzerOn, mode = 'manual', durationSec = 120 }) => {
+    if (!selectedNode) return;
+    setControlBusy(true);
+    try {
+      await axios.post(`${API}/nodes/${selectedNode}/control`, { relayOn, buzzerOn, mode, durationSec });
+      await fetchSummary();
+    } catch (err) {
+      console.error('Control request failed:', err.message);
+    } finally {
+      setControlBusy(false);
+    }
+  };
+
+  const chartData = {
+    labels: history.map((r) => new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+    datasets: [
+      {
+        label: 'Fire Probability %',
+        data: history.map((r) => r.fireProbability),
+        borderColor: '#ff5b45',
+        backgroundColor: 'rgba(255,91,69,0.15)',
+        borderWidth: 2,
+        pointRadius: 2,
+        fill: true,
+        tension: 0.35,
+        yAxisID: 'y'
+      },
+      {
+        label: 'Average MQ2',
+        data: history.map((r) => {
+          const values = Array.isArray(r.mq2) ? r.mq2 : [];
+          if (!values.length) return 0;
+          return values.reduce((s, v) => s + Number(v || 0), 0) / values.length;
+        }),
+        borderColor: '#00c2ff',
+        backgroundColor: 'rgba(0,194,255,0.1)',
+        borderWidth: 1.5,
+        pointRadius: 1,
+        fill: true,
+        tension: 0.35,
+        yAxisID: 'y1'
+      }
+    ]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'top' },
+      title: { display: true, text: `${selectedNode || ''} - Fire Risk Timeline` }
+    },
+    scales: {
+      y: { type: 'linear', min: 0, max: 100, position: 'left', title: { display: true, text: 'Probability %' } },
+      y1: { type: 'linear', position: 'right', title: { display: true, text: 'Gas Level' }, grid: { drawOnChartArea: false } }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="spinner" />
+        <p>Connecting to fire safety network...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <div className="header-left">
+          <span className="header-icon">FIRE</span>
+          <h1>Fire Detection and Pump Automation</h1>
+        </div>
+        <nav className="header-nav">
+          {['dashboard', 'map', 'alerts', 'stats'].map((tab) => (
+            <button
+              key={tab}
+              className={`nav-btn ${activeTab === tab ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
+        <div className="header-right">
+          <span className="live-badge">LIVE</span>
+        </div>
+      </header>
+
+      <main className="app-main">
+        {activeTab === 'dashboard' && (
+          <>
+            <section className="node-cards">
+              {summary.map((node) => (
+                <NodeCard
+                  key={node.nodeId}
+                  node={node}
+                  selected={selectedNode === node.nodeId}
+                  onSelect={() => setSelectedNode(node.nodeId)}
+                  riskColor={getRiskColor(node.latest?.fireProbability ?? node.lastProbability ?? 0)}
+                />
+              ))}
+            </section>
+
+            <section className="chart-section">
+              <div className="chart-controls">
+                <span className="section-title">Risk Trend - {selectedNode}</span>
+                <div className="range-btns">
+                  {['24h', '7d', '30d'].map((r) => (
+                    <button
+                      key={r}
+                      className={`range-btn ${range === r ? 'active' : ''}`}
+                      onClick={() => setRange(r)}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {history.length > 0 ? <Line data={chartData} options={chartOptions} /> : <div className="no-data">No data available for this range</div>}
+            </section>
+
+            {selectedNodeData && (
+              <section className="control-panel">
+                <div className="section-title">Manual Override - {selectedNodeData.nodeId}</div>
+                <div className="control-status">
+                  <span className="status-pill">Mode: {selectedNodeData.actuatorState?.mode || 'auto'}</span>
+                  <span className="status-pill">Relay: {selectedNodeData.actuatorState?.relayOn ? 'ON' : 'OFF'}</span>
+                  <span className="status-pill">Buzzer: {selectedNodeData.actuatorState?.buzzerOn ? 'ON' : 'OFF'}</span>
+                </div>
+                <div className="control-grid">
+                  <button disabled={controlBusy} className="action-btn danger" onClick={() => sendControl({ relayOn: true, buzzerOn: true, mode: 'manual' })}>Emergency ON</button>
+                  <button disabled={controlBusy} className="action-btn warn" onClick={() => sendControl({ relayOn: true, buzzerOn: false, mode: 'manual' })}>Pump ON</button>
+                  <button disabled={controlBusy} className="action-btn warn" onClick={() => sendControl({ relayOn: false, buzzerOn: true, mode: 'manual' })}>Buzzer ON</button>
+                  <button disabled={controlBusy} className="action-btn" onClick={() => sendControl({ relayOn: false, buzzerOn: false, mode: 'manual' })}>All OFF</button>
+                  <button disabled={controlBusy} className="action-btn auto" onClick={() => sendControl({ relayOn: false, buzzerOn: false, mode: 'auto', durationSec: 0 })}>Return to AUTO</button>
+                </div>
+              </section>
+            )}
+
+            {alerts.length > 0 && (
+              <section className="alerts-preview">
+                <div className="section-title">Recent Fire Alerts</div>
+                {alerts.slice(0, 4).map((a, i) => (
+                  <div key={i} className="alert-item">
+                    <span className="alert-node">{a.nodeId}</span>
+                    <span className="alert-aqi" style={{ color: getRiskColor(a.fireProbability) }}>{a.fireProbability}%</span>
+                    <span className="alert-cat">{a.riskLevel}</span>
+                    <span className="alert-time">{new Date(a.timestamp).toLocaleString()}</span>
+                  </div>
+                ))}
+              </section>
+            )}
+          </>
+        )}
+
+        {activeTab === 'map' && <MapView summary={summary} getRiskColor={getRiskColor} />}
+
+        {activeTab === 'alerts' && <AlertsPanel alerts={alerts} getRiskColor={getRiskColor} />}
+
+        {activeTab === 'stats' && (
+          <StatsPanel
+            nodes={summary}
+            selectedNode={selectedNode}
+            onSelectNode={setSelectedNode}
+            API={API}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+export default App;
