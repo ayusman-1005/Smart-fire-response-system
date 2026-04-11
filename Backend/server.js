@@ -101,9 +101,30 @@ function publishControl(nodeId, control) {
 
 function normalizePayload(nodeIdFromTopic, raw) {
   const nodeId = raw.nodeId || nodeIdFromTopic;
-  const flameRaw = Array.isArray(raw.flame) ? raw.flame : [];
-  const mq2Raw = Array.isArray(raw.mq2) ? raw.mq2 : [];
-  const dhtRaw = Array.isArray(raw.dht) ? raw.dht : [];
+  let flameRaw = Array.isArray(raw.flame) ? raw.flame : [];
+  let mq2Raw = Array.isArray(raw.mq2) ? raw.mq2 : [];
+  let dhtRaw = Array.isArray(raw.dht) ? raw.dht : [];
+
+  // Backward compatibility for lightweight test payloads like:
+  // { nodeId, temp, gas } or { nodeId, temperature, gas }
+  if (mq2Raw.length === 0 && (raw.gas !== undefined || raw.mq2Value !== undefined)) {
+    const gas = Number(raw.gas ?? raw.mq2Value ?? 0);
+    mq2Raw = [gas, gas, gas, gas, gas];
+  }
+
+  if (dhtRaw.length === 0 && (raw.temp !== undefined || raw.temperature !== undefined || raw.humidity !== undefined)) {
+    const temp = Number(raw.temp ?? raw.temperature ?? 0);
+    const humidity = Number(raw.humidity ?? 0);
+    dhtRaw = [
+      { temperature: temp, humidity },
+      { temperature: temp, humidity }
+    ];
+  }
+
+  if (flameRaw.length === 0) {
+    const flameDetected = Number(raw.flameDetected ?? raw.fire ?? 0) === 1;
+    flameRaw = [flameDetected ? 1 : 0, 0, 0, 0, 0];
+  }
 
   const flame = flameRaw.slice(0, 5).map((v) => {
     if (typeof v === 'boolean') return v;
