@@ -19,6 +19,12 @@ function NodeCard({ node, selected, onSelect, riskColor }) {
   const gasAvg = Array.isArray(latest.mq2) && latest.mq2.length
     ? (latest.mq2.reduce((s, v) => s + Number(v || 0), 0) / latest.mq2.length).toFixed(1)
     : '--';
+  const tempMax = Array.isArray(latest.dht) && latest.dht.length
+    ? Math.max(...latest.dht.map(d => d.temperature || 0)).toFixed(1)
+    : '--';
+  const humMin = Array.isArray(latest.dht) && latest.dht.length
+    ? Math.min(...latest.dht.map(d => d.humidity || 100)).toFixed(1)
+    : '--';
 
   return (
     <div
@@ -40,12 +46,20 @@ function NodeCard({ node, selected, onSelect, riskColor }) {
 
       <div className="card-metrics">
         <div className="metric">
+          <span className="metric-label">Temperature</span>
+          <span className="metric-value">{tempMax} <small>°C</small></span>
+        </div>
+        <div className="metric">
+          <span className="metric-label">Humidity</span>
+          <span className="metric-value">{humMin} <small>%</small></span>
+        </div>
+        <div className="metric">
           <span className="metric-label">Flame Hits</span>
           <span className="metric-value">{flameHits} <small>/5</small></span>
         </div>
         <div className="metric">
           <span className="metric-label">MQ2 Avg</span>
-          <span className="metric-value">{gasAvg}</span>
+          <span className="metric-value">{gasAvg} <small>ppm</small></span>
         </div>
         <div className="metric">
           <span className="metric-label">Water Pump</span>

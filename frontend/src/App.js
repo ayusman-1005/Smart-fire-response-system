@@ -236,7 +236,7 @@ function App() {
           ))}
         </nav>
         <div className="header-right">
-          <span className="live-badge">LIVE</span>
+          <span className="live-badge">LIVE SECURE</span>
         </div>
       </header>
 
@@ -255,22 +255,8 @@ function App() {
               ))}
             </section>
 
-            <section className="chart-section">
-              <div className="chart-controls">
-                <span className="section-title">Risk Trend - {selectedNode}</span>
-                <div className="range-btns">
-                  {['24h', '7d', '30d'].map((r) => (
-                    <button
-                      key={r}
-                      className={`range-btn ${range === r ? 'active' : ''}`}
-                      onClick={() => setRange(r)}
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {history.length > 0 ? <Line data={chartData} options={chartOptions} /> : <div className="no-data">No data available for this range</div>}
+            <section className="map-preview-section" style={{marginBottom: '24px'}}>
+               <MapView summary={summary} getRiskColor={getRiskColor} />
             </section>
 
             {selectedNodeData && (

@@ -37,6 +37,8 @@ function MapView({ summary, getRiskColor }) {
                   <strong>{node.name || node.nodeId}</strong><br />
                   Fire Probability: <strong style={{ color }}>{probability}%</strong><br />
                   Risk: {node.latest?.riskLevel || node.lastRisk || '--'}<br />
+                  Temp: {Array.isArray(node.latest?.dht) && node.latest.dht.length ? Math.max(...node.latest.dht.map(d => d.temperature || 0)).toFixed(1) : '--'}°C<br />
+                  Avg Gas: {Array.isArray(node.latest?.mq2) && node.latest.mq2.length ? (node.latest.mq2.reduce((a,b)=>a+b,0)/node.latest.mq2.length).toFixed(1) : '--'} ppm<br />
                   Flame hits: {Array.isArray(node.latest?.flame) ? node.latest.flame.filter(Boolean).length : 0}/5<br />
                   Water Pump: {node.actuatorState?.relayOn ? 'ON' : 'OFF'}<br />
                   Siren: {node.actuatorState?.buzzerOn ? 'ON' : 'OFF'}
