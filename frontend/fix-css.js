@@ -1,4 +1,6 @@
+const fs = require('fs');
 
+const css = `
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 :root {
@@ -90,3 +92,7 @@ body {
 .footer ul li { margin-bottom: 8px; cursor: pointer; transition: color 0.2s; }
 .footer ul li:hover { color: var(--text-main); }
 
+`;
+
+fs.writeFileSync('c:/Users/ayusm/projects/IOT project/Project IoT/Project IoT/frontend/src/App.css', css, 'utf8');
+console.log('Done fixing css');
