@@ -33,6 +33,7 @@ function App() {
   const [manualDuration, setManualDuration] = useState('0');
   const [nodeLat, setNodeLat] = useState("");
   const [nodeLng, setNodeLng] = useState("");
+  const [theme, setTheme] = useState(() => localStorage.getItem('dashboardTheme') || 'light');
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -110,6 +111,11 @@ function App() {
     const interval = setInterval(fetchHistory, POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [fetchHistory]);
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('dashboardTheme', theme);
+  }, [theme]);
 
   const getRiskColor = (riskOrProbability) => {
     if (typeof riskOrProbability === 'number') {
@@ -263,6 +269,12 @@ function App() {
           ))}
         </nav>
         <div className="header-right">
+          <button
+            className="theme-btn"
+            onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+          >
+            {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+          </button>
           <span className="live-badge">LIVE SECURE</span>
         </div>
       </header>

@@ -12,7 +12,7 @@ function MapView({ summary, getRiskColor }) {
       <div style={{ height: '600px', borderRadius: '12px', overflow: 'hidden' }}>
         <MapContainer center={center} zoom={16} style={{ height: '100%', width: '100%' }}>
           <TileLayer
-            attribution='© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+              attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {summary.map(node => {
@@ -34,7 +34,7 @@ function MapView({ summary, getRiskColor }) {
                   <strong>{node.name || node.nodeId}</strong><br />
                   Fire Probability: <strong style={{ color }}>{probability}%</strong><br />
                   Risk: {node.latest?.riskLevel || node.lastRisk || '--'}<br />
-                  Temp: {Array.isArray(node.latest?.dht) && node.latest.dht.length ? Math.max(...node.latest.dht.map(d => d.temperature || 0)).toFixed(1) : '--'}°C<br />
+                  Temp: {Array.isArray(node.latest?.dht) && node.latest.dht.length ? Math.max(...node.latest.dht.map(d => d.temperature || 0)).toFixed(1) : '--'} deg C<br />
                   Avg Gas: {Array.isArray(node.latest?.mq2) && node.latest.mq2.length ? (node.latest.mq2.reduce((a,b)=>a+b,0)/node.latest.mq2.length).toFixed(1) : '--'} ppm<br />
                   Flame hits: {Array.isArray(node.latest?.flame) ? node.latest.flame.filter(Boolean).length : 0}/5<br />
                   Water Pump: {node.actuatorState?.relayOn ? 'ON' : 'OFF'}<br />
@@ -49,10 +49,10 @@ function MapView({ summary, getRiskColor }) {
       {/* AQI Legend */}
       <div className="map-legend">
         {[
-          { label: 'Low', color: '#32d74b', range: '0–34%' },
-          { label: 'Medium', color: '#ffd60a', range: '35–59%' },
-          { label: 'High', color: '#ff8c00', range: '60–79%' },
-          { label: 'Critical', color: '#ff3b30', range: '80–100%' }
+           { label: 'Low', color: '#32d74b', range: '0-34%' },
+           { label: 'Medium', color: '#ffd60a', range: '35-59%' },
+           { label: 'High', color: '#ff8c00', range: '60-79%' },
+           { label: 'Critical', color: '#ff3b30', range: '80-100%' }
         ].map(item => (
           <div key={item.label} className="legend-item">
             <span className="legend-dot" style={{ background: item.color }} />
