@@ -29,6 +29,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [controlBusy, setControlBusy] = useState(false);
+  const [manualDuration, setManualDuration] = useState('0');
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -100,14 +101,39 @@ function App() {
 
   const selectedNodeData = summary.find((n) => n.nodeId === selectedNode);
 
-  const sendControl = async ({ relayOn, buzzerOn, mode = 'manual', durationSec = 120 }) => {
+  const sendControl = async ({ relayOn, buzzerOn, mode = 'manual', durationSec }) => {
     if (!selectedNode) return;
     setControlBusy(true);
+    const resolvedDuration = typeof durationSec === 'number' ? durationSec : Number(manualDuration);
+
+    // Optimistic UI update for faster feedback while command is in-flight.
+    setSummary((prev) => prev.map((node) => {
+      if (node.nodeId !== selectedNode) return node;
+      return {
+        ...node,
+        actuatorState: {
+          relayOn,
+          buzzerOn,
+          mode,
+          updatedAt: new Date().toISOString(),
+          source: 'ui-pending'
+        }
+      };
+    }));
+
     try {
-      await axios.post(`${API}/nodes/${selectedNode}/control`, { relayOn, buzzerOn, mode, durationSec });
+      await axios.post(`${API}/nodes/${selectedNode}/control`, {
+        relayOn,
+        buzzerOn,
+        mode,
+        durationSec: resolvedDuration
+      });
       await fetchSummary();
+      await fetchHistory();
+      await fetchAlerts();
     } catch (err) {
       console.error('Control request failed:', err.message);
+      await fetchSummary();
     } finally {
       setControlBusy(false);
     }
@@ -119,8 +145,8 @@ function App() {
       {
         label: 'Fire Probability %',
         data: history.map((r) => r.fireProbability),
-        borderColor: '#ff5b45',
-        backgroundColor: 'rgba(255,91,69,0.15)',
+        borderColor: '#3ca8ff',
+        backgroundColor: 'rgba(60,168,255,0.16)',
         borderWidth: 2,
         pointRadius: 2,
         fill: true,
@@ -134,8 +160,8 @@ function App() {
           if (!values.length) return 0;
           return values.reduce((s, v) => s + Number(v || 0), 0) / values.length;
         }),
-        borderColor: '#00c2ff',
-        backgroundColor: 'rgba(0,194,255,0.1)',
+        borderColor: '#8be0ff',
+        backgroundColor: 'rgba(139,224,255,0.1)',
         borderWidth: 1.5,
         pointRadius: 1,
         fill: true,
@@ -228,13 +254,27 @@ function App() {
                 <div className="section-title">Manual Override - {selectedNodeData.nodeId}</div>
                 <div className="control-status">
                   <span className="status-pill">Mode: {selectedNodeData.actuatorState?.mode || 'auto'}</span>
-                  <span className="status-pill">Relay: {selectedNodeData.actuatorState?.relayOn ? 'ON' : 'OFF'}</span>
-                  <span className="status-pill">Buzzer: {selectedNodeData.actuatorState?.buzzerOn ? 'ON' : 'OFF'}</span>
+                  <span className="status-pill">Water Pump: {selectedNodeData.actuatorState?.relayOn ? 'ON' : 'OFF'}</span>
+                  <span className="status-pill">Siren: {selectedNodeData.actuatorState?.buzzerOn ? 'ON' : 'OFF'}</span>
+                </div>
+                <div className="control-duration-row">
+                  <label htmlFor="holdDuration" className="duration-label">Manual Hold</label>
+                  <select
+                    id="holdDuration"
+                    className="duration-select"
+                    value={manualDuration}
+                    onChange={(e) => setManualDuration(e.target.value)}
+                  >
+                    <option value="0">Until Return to AUTO</option>
+                    <option value="60">1 minute</option>
+                    <option value="300">5 minutes</option>
+                    <option value="900">15 minutes</option>
+                  </select>
                 </div>
                 <div className="control-grid">
                   <button disabled={controlBusy} className="action-btn danger" onClick={() => sendControl({ relayOn: true, buzzerOn: true, mode: 'manual' })}>Emergency ON</button>
-                  <button disabled={controlBusy} className="action-btn warn" onClick={() => sendControl({ relayOn: true, buzzerOn: false, mode: 'manual' })}>Pump ON</button>
-                  <button disabled={controlBusy} className="action-btn warn" onClick={() => sendControl({ relayOn: false, buzzerOn: true, mode: 'manual' })}>Buzzer ON</button>
+                  <button disabled={controlBusy} className="action-btn warn" onClick={() => sendControl({ relayOn: true, buzzerOn: false, mode: 'manual' })}>Water Pump ON</button>
+                  <button disabled={controlBusy} className="action-btn warn" onClick={() => sendControl({ relayOn: false, buzzerOn: true, mode: 'manual' })}>Siren ON</button>
                   <button disabled={controlBusy} className="action-btn" onClick={() => sendControl({ relayOn: false, buzzerOn: false, mode: 'manual' })}>All OFF</button>
                   <button disabled={controlBusy} className="action-btn auto" onClick={() => sendControl({ relayOn: false, buzzerOn: false, mode: 'auto', durationSec: 0 })}>Return to AUTO</button>
                 </div>

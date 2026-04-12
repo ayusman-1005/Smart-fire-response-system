@@ -36,7 +36,7 @@ function AlertsPanel({ alerts, getRiskColor }) {
                 </td>
                 <td>{a.riskLevel}</td>
                 <td>{Array.isArray(a.flame) ? a.flame.filter(Boolean).length : 0}/5</td>
-                <td>{a.decision?.relayOn || a.decision?.buzzerOn ? 'AUTO ON' : 'NO ACTION'}</td>
+                <td>{a.decision?.relayOn || a.decision?.buzzerOn ? 'AUTO ACTUATED' : 'NO ACTION'}</td>
                 <td>{new Date(a.timestamp).toLocaleString()}</td>
               </tr>
             ))}

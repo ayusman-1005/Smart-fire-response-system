@@ -48,11 +48,11 @@ function NodeCard({ node, selected, onSelect, riskColor }) {
           <span className="metric-value">{gasAvg}</span>
         </div>
         <div className="metric">
-          <span className="metric-label">Relay</span>
+          <span className="metric-label">Water Pump</span>
           <span className="metric-value">{node.actuatorState?.relayOn ? 'ON' : 'OFF'}</span>
         </div>
         <div className="metric">
-          <span className="metric-label">Buzzer</span>
+          <span className="metric-label">Siren</span>
           <span className="metric-value">{node.actuatorState?.buzzerOn ? 'ON' : 'OFF'}</span>
         </div>
       </div>

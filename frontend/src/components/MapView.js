@@ -38,8 +38,8 @@ function MapView({ summary, getRiskColor }) {
                   Fire Probability: <strong style={{ color }}>{probability}%</strong><br />
                   Risk: {node.latest?.riskLevel || node.lastRisk || '--'}<br />
                   Flame hits: {Array.isArray(node.latest?.flame) ? node.latest.flame.filter(Boolean).length : 0}/5<br />
-                  Relay: {node.actuatorState?.relayOn ? 'ON' : 'OFF'}<br />
-                  Buzzer: {node.actuatorState?.buzzerOn ? 'ON' : 'OFF'}
+                  Water Pump: {node.actuatorState?.relayOn ? 'ON' : 'OFF'}<br />
+                  Siren: {node.actuatorState?.buzzerOn ? 'ON' : 'OFF'}
                 </Popup>
               </CircleMarker>
             );
