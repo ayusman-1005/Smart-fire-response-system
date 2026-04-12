@@ -1,22 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import {
-  Chart as ChartJS,
-  CategoryScale, LinearScale, PointElement, LineElement,
-  Title, Tooltip, Legend, Filler
-} from 'chart.js';
-import { Line } from 'react-chartjs-2';
 import MapView from './components/MapView.js';
 import NodeCard from './components/NodeCard.js';
 import AlertsPanel from './components/AlertsPanel.js';
 import StatsPanel from './components/StatsPanel.js';
+import GraphsPanel from './components/GraphsPanel.js';
 import Footer from './components/Footer.js';
 import './App.css';
-
-ChartJS.register(
-  CategoryScale, LinearScale, PointElement, LineElement,
-  Title, Tooltip, Legend, Filler
-);
 
 const API = process.env.REACT_APP_API_URL || '/api';
 const POLL_INTERVAL = 8000;
@@ -33,9 +23,7 @@ function sortNodes(nodes) {
 function App() {
   const [summary, setSummary] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
-  const [history, setHistory] = useState([]);
   const [alerts, setAlerts] = useState([]);
-  const [range, setRange] = useState('24h');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [controlBusy, setControlBusy] = useState(false);
@@ -56,16 +44,6 @@ function App() {
       console.error('Summary fetch error:', err.message);
     }
   }, [selectedNode]);
-
-  const fetchHistory = useCallback(async () => {
-    if (!selectedNode) return;
-    try {
-      const res = await axios.get(`${API}/nodes/${selectedNode}/data?range=${range}`);
-      setHistory(res.data);
-    } catch (err) {
-      console.error('History fetch error:', err.message);
-    }
-  }, [selectedNode, range]);
 
   const fetchAlerts = useCallback(async () => {
     try {
@@ -115,12 +93,6 @@ function App() {
 
     return () => clearInterval(interval);
   }, [fetchSummary, fetchAlerts]);
-
-  useEffect(() => {
-    fetchHistory();
-    const interval = setInterval(fetchHistory, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchHistory]);
 
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
@@ -203,58 +175,12 @@ function App() {
         durationSec: resolvedDuration
       });
       await fetchSummary();
-      await fetchHistory();
       await fetchAlerts();
     } catch (err) {
       console.error('Control request failed:', err.message);
       await fetchSummary();
     } finally {
       setControlBusy(false);
-    }
-  };
-
-  const chartData = {
-    labels: history.map((r) => new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
-    datasets: [
-      {
-        label: 'Fire Probability %',
-        data: history.map((r) => r.fireProbability),
-        borderColor: '#3ca8ff',
-        backgroundColor: 'rgba(60,168,255,0.16)',
-        borderWidth: 2,
-        pointRadius: 2,
-        fill: true,
-        tension: 0.35,
-        yAxisID: 'y'
-      },
-      {
-        label: 'Average MQ2',
-        data: history.map((r) => {
-          const values = Array.isArray(r.mq2) ? r.mq2 : [];
-          if (!values.length) return 0;
-          return values.reduce((s, v) => s + Number(v || 0), 0) / values.length;
-        }),
-        borderColor: '#8be0ff',
-        backgroundColor: 'rgba(139,224,255,0.1)',
-        borderWidth: 1.5,
-        pointRadius: 1,
-        fill: true,
-        tension: 0.35,
-        yAxisID: 'y1'
-      }
-    ]
-  };
-
-  const chartOptions = {
-    responsive: true,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: { position: 'top' },
-      title: { display: true, text: `${selectedNode || ''} - Fire Risk Timeline` }
-    },
-    scales: {
-      y: { type: 'linear', min: 0, max: 100, position: 'left', title: { display: true, text: 'Probability %' } },
-      y1: { type: 'linear', position: 'right', title: { display: true, text: 'Gas Level' }, grid: { drawOnChartArea: false } }
     }
   };
 
@@ -275,7 +201,7 @@ function App() {
           <h1>NIT Rourkela Centralised Fire Station</h1>
         </div>
         <nav className="header-nav">
-          {['dashboard', 'map', 'alerts', 'stats'].map((tab) => (
+          {['dashboard', 'map', 'graphs', 'alerts', 'stats'].map((tab) => (
             <button
               key={tab}
               className={`nav-btn ${activeTab === tab ? 'active' : ''}`}
@@ -431,6 +357,8 @@ function App() {
             )}
           </>
         )}
+
+        {activeTab === 'graphs' && <GraphsPanel nodes={summary} API={API} />}
 
         {activeTab === 'alerts' && <AlertsPanel alerts={alerts} getRiskColor={getRiskColor} API={API} stopAlarm={stopAlarmSound} />}
 

@@ -202,6 +202,11 @@ body[data-theme='dark'] .app-header {
   box-shadow: 0 0 0 2px var(--primary), var(--shadow);
 }
 
+.node-card.offline {
+  opacity: 0.9;
+  border-style: dashed;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -238,6 +243,10 @@ body[data-theme='dark'] .app-header {
   font-size: 0.95rem;
 }
 
+.card-category.offline {
+  color: #7a8ca3;
+}
+
 .card-metrics {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -271,6 +280,7 @@ body[data-theme='dark'] .app-header {
 .map-preview-section,
 .map-section,
 .control-panel,
+.graphs-section,
 .alerts-preview,
 .alerts-section,
 .stats-section {
@@ -494,6 +504,29 @@ body[data-theme='dark'] .app-header {
 .map-section .leaflet-container {
   border-radius: 12px;
   border: 1px solid var(--border);
+}
+
+.graph-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 12px;
+}
+
+.graph-card {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.graph-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.graph-canvas-wrap {
+  height: 280px;
 }
 
 .map-legend {

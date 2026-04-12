@@ -2,18 +2,24 @@
 import React from 'react';
 
 function NodeCard({ node, selected, onSelect, riskColor }) {
+  const OFFLINE_THRESHOLD_SEC = 5 * 60;
   const latest = node.latest || {};
   const timeSince = node.lastSeen
     ? Math.floor((Date.now() - new Date(node.lastSeen)) / 1000)
     : null;
+  const isOffline = timeSince === null || timeSince > OFFLINE_THRESHOLD_SEC;
 
-  const timeLabel = timeSince === null
-    ? 'Never seen'
+  const timeLabel = isOffline
+    ? 'Offline'
     : timeSince < 60
     ? `${timeSince}s ago`
     : timeSince < 3600
     ? `${Math.floor(timeSince / 60)}m ago`
     : `${Math.floor(timeSince / 3600)}h ago`;
+
+  const displayRiskColor = isOffline ? '#7a8ca3' : riskColor;
+  const probability = isOffline ? '--' : (latest.fireProbability ?? node.lastProbability ?? '--');
+  const categoryLabel = isOffline ? 'OFFLINE' : (latest.riskLevel || node.lastRisk || '--');
 
   const flameHits = Array.isArray(latest.flame) ? latest.flame.filter(Boolean).length : 0;
   const gasAvg = Array.isArray(latest.mq2) && latest.mq2.length
@@ -28,21 +34,21 @@ function NodeCard({ node, selected, onSelect, riskColor }) {
 
   return (
     <div
-      className={`node-card ${selected ? 'selected' : ''}`}
+      className={`node-card ${selected ? 'selected' : ''} ${isOffline ? 'offline' : ''}`}
       onClick={onSelect}
-      style={{ borderTop: `4px solid ${riskColor}` }}
+      style={{ borderTop: `4px solid ${displayRiskColor}` }}
     >
       <div className="card-header">
         <span className="card-title">{node.name || node.nodeId}</span>
         <span className="card-time">{timeLabel}</span>
       </div>
 
-      <div className="card-aqi" style={{ color: riskColor }}>
-        {latest.fireProbability ?? node.lastProbability ?? '--'}
-        <span className="card-aqi-label">%</span>
+      <div className="card-aqi" style={{ color: displayRiskColor }}>
+        {probability}
+        {probability !== '--' && <span className="card-aqi-label">%</span>}
       </div>
 
-      <div className="card-category">{latest.riskLevel || node.lastRisk || '--'}</div>
+      <div className={`card-category ${isOffline ? 'offline' : ''}`}>{categoryLabel}</div>
 
       <div className="card-metrics">
         <div className="metric">
