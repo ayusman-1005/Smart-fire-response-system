@@ -10,6 +10,7 @@ import MapView from './components/MapView.js';
 import NodeCard from './components/NodeCard.js';
 import AlertsPanel from './components/AlertsPanel.js';
 import StatsPanel from './components/StatsPanel.js';
+import Footer from './components/Footer.js';
 import './App.css';
 
 ChartJS.register(
@@ -30,16 +31,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [controlBusy, setControlBusy] = useState(false);
   const [manualDuration, setManualDuration] = useState('0');
-  const [isDarkTheme, setIsDarkTheme] = useState(true);
-
-  // New states for editing map location
-  const [editLocationNode, setEditLocationNode] = useState(null);
-  const [editLat, setEditLat] = useState('');
-  const [editLng, setEditLng] = useState('');
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', isDarkTheme ? 'dark' : 'light');
-  }, [isDarkTheme]);
+  const [nodeLat, setNodeLat] = useState("");
+  const [nodeLng, setNodeLng] = useState("");
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -133,21 +126,31 @@ function App() {
     return '#32d74b';
   };
 
-  const updateLocation = async () => {
-    if (!editLocationNode) return;
-    try {
-      await axios.post(`${API}/nodes/${editLocationNode}/settings`, { 
-         lat: Number(editLat), 
-         lng: Number(editLng) 
-      });
-      setEditLocationNode(null);
-      await fetchSummary();
-    } catch(err) {
-      console.error('Location update failed', err);
-    }
-  };
-
   const selectedNodeData = summary.find((n) => n.nodeId === selectedNode);
+
+  // Sync coords on node change
+  useEffect(() => {
+     if (selectedNodeData?.location) {
+        setNodeLat(selectedNodeData.location.lat || "");
+        setNodeLng(selectedNodeData.location.lng || "");
+     }
+  }, [selectedNodeData]);
+
+  const saveCoords = async () => {
+     if (!selectedNodeData) return;
+     try {
+       await axios.post(`${API}/nodes/${selectedNode}/settings`, {
+         name: selectedNodeData.name || selectedNode,
+         lat: Number(nodeLat),
+         lng: Number(nodeLng)
+       });
+       await fetchSummary();
+       alert('Coordinates updated!');
+     } catch(err) {
+       console.error(err);
+       alert('Failed to update coords');
+     }
+  }
 
   const sendControl = async ({ relayOn, buzzerOn, mode = 'manual', durationSec }) => {
     if (!selectedNode) return;
@@ -265,10 +268,7 @@ function App() {
             </button>
           ))}
         </nav>
-        <div className="header-right" style={{display:'flex', alignItems:'center', gap:'15px'}}>
-          <button className="theme-btn" onClick={() => setIsDarkTheme(!isDarkTheme)} title="Toggle Light/Dark Theme">
-             {isDarkTheme ? '☀️' : '🌙'}
-          </button>
+        <div className="header-right">
           <span className="live-badge" style={{ padding: '6px 12px', background: 'rgba(50, 215, 75, 0.2)', color: '#32d74b', borderRadius: '20px', fontWeight: '700', fontSize: '12px' }}>● LIVE SECURE CITY</span>
         </div>
       </header>
@@ -299,23 +299,17 @@ function App() {
 
             {selectedNodeData && (
               <section className="control-panel">
-                <div className="section-title" style={{display:'flex', justifyContent:'space-between'}}>
-                  <span>Manual Override - {selectedNodeData.name || selectedNodeData.nodeId}</span>
-                  {editLocationNode !== selectedNodeData.nodeId ? (
-                     <button className="action-btn" style={{padding:'4px 10px', fontSize:'12px'}} onClick={() => {
-                        setEditLocationNode(selectedNodeData.nodeId);
-                        setEditLat(selectedNodeData.location?.lat || 22.2515);
-                        setEditLng(selectedNodeData.location?.lng || 84.9020);
-                     }}>Edit Location</button>
-                  ) : (
-                     <div style={{display:'flex', gap:'5px', fontSize:'12px'}}>
-                        <input type="number" style={{width:'80px', padding:'4px', background:'var(--bg-panel)', color:'var(--text-main)', border:'1px solid #444'}} value={editLat} onChange={e=>setEditLat(e.target.value)} />
-                        <input type="number" style={{width:'80px', padding:'4px', background:'var(--bg-panel)', color:'var(--text-main)', border:'1px solid #444'}} value={editLng} onChange={e=>setEditLng(e.target.value)} />
-                        <button className="action-btn auto" style={{padding:'4px 8px'}} onClick={updateLocation}>Save</button>
-                        <button className="action-btn" style={{padding:'4px 8px'}} onClick={()=>setEditLocationNode(null)}>Cancel</button>
-                     </div>
-                  )}
+                <div className="section-title">Manual Override - {selectedNodeData.name || selectedNodeData.nodeId}</div>
+                
+                <div className="coord-editor">
+                  <div style={{color: '#aaa', fontSize: '13px', marginRight: '10px'}}>Map Pins Setup:</div>
+                  <label style={{color:'#fff', fontSize:'14px'}}>Lat:</label>
+                  <input className="coord-input" type="number" step="0.0001" value={nodeLat} onChange={e=>setNodeLat(e.target.value)} />
+                  <label style={{color:'#fff', fontSize:'14px', marginLeft:'10px'}}>Lng:</label>
+                  <input className="coord-input" type="number" step="0.0001" value={nodeLng} onChange={e=>setNodeLng(e.target.value)} />
+                  <button className="coord-save-btn" onClick={saveCoords}>Update Location</button>
                 </div>
+
                 <div className="control-status">
                   <span className="status-pill">Mode: {selectedNodeData.actuatorState?.mode || 'auto'}</span>
                   <span className="status-pill">Water Pump: {selectedNodeData.actuatorState?.relayOn ? 'ON' : 'OFF'}</span>
@@ -338,27 +332,33 @@ function App() {
                 <div className="control-grid">
                   <button 
                     disabled={controlBusy} 
-                    className={`action-btn danger ${(selectedNodeData.actuatorState?.relayOn && selectedNodeData.actuatorState?.buzzerOn) ? 'active-pressed' : ''}`} 
+                    className={`action-btn danger ${selectedNodeData.actuatorState?.relayOn && selectedNodeData.actuatorState?.buzzerOn ? 'active' : ''}`}
                     onClick={() => sendControl({ relayOn: true, buzzerOn: true, mode: 'manual' })}>
-                    {selectedNodeData.actuatorState?.relayOn && selectedNodeData.actuatorState?.buzzerOn ? "EMERGENCY ACTIVE" : "Emergency ON"}
+                    Emergency ON
                   </button>
                   <button 
                     disabled={controlBusy} 
-                    className={`action-btn warn ${selectedNodeData.actuatorState?.relayOn && !selectedNodeData.actuatorState?.buzzerOn ? 'active-pressed' : ''}`} 
+                    className={`action-btn warn ${selectedNodeData.actuatorState?.relayOn && !selectedNodeData.actuatorState?.buzzerOn ? 'active' : ''}`}
                     onClick={() => sendControl({ relayOn: true, buzzerOn: false, mode: 'manual' })}>
-                    {selectedNodeData.actuatorState?.relayOn && !selectedNodeData.actuatorState?.buzzerOn ? "PUMP ACTIVE" : "Water Pump ON"}
+                    Water Pump ON
                   </button>
                   <button 
                     disabled={controlBusy} 
-                    className={`action-btn warn ${!selectedNodeData.actuatorState?.relayOn && selectedNodeData.actuatorState?.buzzerOn ? 'active-pressed' : ''}`} 
+                    className={`action-btn warn ${!selectedNodeData.actuatorState?.relayOn && selectedNodeData.actuatorState?.buzzerOn ? 'active' : ''}`}
                     onClick={() => sendControl({ relayOn: false, buzzerOn: true, mode: 'manual' })}>
-                    {selectedNodeData.actuatorState?.buzzerOn && !selectedNodeData.actuatorState?.relayOn ? "SIREN ACTIVE" : "Siren ON"}
+                    Siren ON
                   </button>
                   <button 
                     disabled={controlBusy} 
-                    className={`action-btn auto ${selectedNodeData.actuatorState?.mode === 'auto' ? 'active-pressed' : ''}`} 
+                    className={`action-btn ${!selectedNodeData.actuatorState?.relayOn && !selectedNodeData.actuatorState?.buzzerOn ? 'active' : ''}`} 
+                    onClick={() => sendControl({ relayOn: false, buzzerOn: false, mode: 'manual' })}>
+                    All OFF
+                  </button>
+                  <button 
+                    disabled={controlBusy} 
+                    className={`action-btn auto ${selectedNodeData.actuatorState?.mode === 'auto' ? 'active' : ''}`} 
                     onClick={() => sendControl({ relayOn: false, buzzerOn: false, mode: 'auto', durationSec: 0 })}>
-                    {selectedNodeData.actuatorState?.mode === 'auto' ? "AUTO MODE (RESET)" : "Return to AUTO / OFF"}
+                    Return to AUTO
                   </button>
                 </div>
               </section>
@@ -394,53 +394,7 @@ function App() {
         )}
       </main>
 
-      <section className="dev-section">
-        <h2 className="dev-title">OUR DEVELOPERS</h2>
-        <div className="dev-grid">
-          {[
-            { id: 'ab', initials: 'AB', name: 'Ayusman Behera', color: '#f26f21', link: 'https://www.linkedin.com/in/ayusman-behera-43354b270/' },
-            { id: 'uh', initials: 'UH', name: 'Udayanath Hota', color: '#e52c2c', link: 'https://www.linkedin.com/in/udaynath-hota/' },
-            { id: 'sn', initials: 'SN', name: 'Stephen Nayak', color: '#8c52ff' },
-            { id: 'aa', initials: 'AA', name: 'Anas Ahmed', color: '#2c82e5' },
-            { id: 'ml', initials: 'ML', name: 'Mayank Lohan', color: '#32d74b' },
-            { id: 'ar', initials: 'AR', name: 'Ansh Rajpal', color: '#ffb300' }
-          ].map(dev => (
-             <a key={dev.id} href={dev.link || '#'} target={dev.link ? "_blank" : "_self"} rel="noreferrer" className="dev-card" style={{ cursor: dev.link ? 'pointer' : 'default', textDecoration: 'none' }}>
-               <div className="dev-avatar" style={{ background: dev.color }}>
-                 {dev.initials}
-               </div>
-               <div className="dev-name">{dev.name}</div>
-             </a>
-          ))}
-        </div>
-      </section>
-
-      <footer className="footer">
-        <div>
-          <h4>About SFRS Monitor</h4>
-          <p style={{ maxWidth:'280px', lineHeight:'1.5' }}>
-            Real-time fire quality monitoring system providing accurate readings, early warning mechanisms, and automated water pump integrations.
-          </p>
-        </div>
-        <div>
-          <h4>Features</h4>
-          <ul>
-            <li>Real-time Fire monitoring</li>
-            <li>Temperature & Humidity tracking</li>
-            <li>Severe flame/gas alerts</li>
-            <li>Instant Pump Automation</li>
-          </ul>
-        </div>
-        <div>
-          <h4>Resources</h4>
-          <ul>
-            <li>Gas Scale Information</li>
-            <li>Safety Guidelines</li>
-            <li>Data Sources</li>
-            <li>Support</li>
-          </ul>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

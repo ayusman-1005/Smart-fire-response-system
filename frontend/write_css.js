@@ -1,3 +1,6 @@
+const fs = require('fs');
+
+const cssText = `
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 * {
@@ -321,3 +324,7 @@ body {
   line-height: 2;
   display: block;
 }
+`;
+
+fs.writeFileSync('src/App.css', cssText.trim(), 'utf8');
+console.log('App.css written completely in UTF-8');
