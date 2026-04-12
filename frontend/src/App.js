@@ -219,16 +219,22 @@ function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <div className="header-left">
-          <span className="header-icon">FIRE</span>
-          <h1>Fire Detection and Pump Automation</h1>
+      <header className="app-header" style={{ padding: '20px 40px', background: '#0a0a0a', borderBottom: '1px solid #333' }}>
+        <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <span className="header-icon" style={{ fontSize: '28px', color: '#ff3b30' }}>🔥</span>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '1px', color: '#fff', margin: 0 }}>NIT Rourkela City-Wide Fire Station Dashboard</h1>
         </div>
-        <nav className="header-nav">
+        <nav className="header-nav" style={{ display: 'flex', gap: '10px' }}>
           {['dashboard', 'map', 'alerts', 'stats'].map((tab) => (
             <button
               key={tab}
               className={`nav-btn ${activeTab === tab ? 'active' : ''}`}
+              style={{
+                 padding: '8px 16px', borderRadius: '8px', 
+                 textTransform: 'uppercase', fontSize: '13px', fontWeight: '600',
+                 backgroundColor: activeTab === tab ? '#ff3b30' : 'transparent',
+                 color: activeTab === tab ? '#fff' : '#a0a0a0', border: 'none', cursor: 'pointer'
+              }}
               onClick={() => setActiveTab(tab)}
             >
               {tab}
@@ -236,14 +242,14 @@ function App() {
           ))}
         </nav>
         <div className="header-right">
-          <span className="live-badge">LIVE SECURE</span>
+          <span className="live-badge" style={{ padding: '6px 12px', background: 'rgba(50, 215, 75, 0.2)', color: '#32d74b', borderRadius: '20px', fontWeight: '700', fontSize: '12px' }}>● LIVE SECURE CITY</span>
         </div>
       </header>
 
-      <main className="app-main">
+      <main className="app-main" style={{ padding: '30px', background: '#121212', minHeight: '100vh', color: '#e0e0e0' }}>
         {activeTab === 'dashboard' && (
           <>
-            <section className="node-cards">
+            <section className="node-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px', marginBottom: '40px' }}>
               {summary.map((node) => (
                 <NodeCard
                   key={node.nodeId}
@@ -251,6 +257,11 @@ function App() {
                   selected={selectedNode === node.nodeId}
                   onSelect={() => setSelectedNode(node.nodeId)}
                   riskColor={getRiskColor(node.latest?.fireProbability ?? node.lastProbability ?? 0)}
+                  style={{
+                     background: '#1c1c1e', padding: '20px', borderRadius: '16px', cursor: 'pointer',
+                     boxShadow: selectedNode === node.nodeId ? `0 0 15px ${getRiskColor(node.latest?.fireProbability ?? node.lastProbability ?? 0)}` : '0 4px 6px rgba(0,0,0,0.2)',
+                     transition: '0.3s ease', outline: selectedNode === node.nodeId ? `2px solid ${getRiskColor(node.latest?.fireProbability ?? node.lastProbability ?? 0)}` : 'none'
+                  }}
                 />
               ))}
             </section>
@@ -261,7 +272,7 @@ function App() {
 
             {selectedNodeData && (
               <section className="control-panel">
-                <div className="section-title">Manual Override - {selectedNodeData.nodeId}</div>
+                <div className="section-title">Manual Override - {selectedNodeData.name || selectedNodeData.nodeId}</div>
                 <div className="control-status">
                   <span className="status-pill">Mode: {selectedNodeData.actuatorState?.mode || 'auto'}</span>
                   <span className="status-pill">Water Pump: {selectedNodeData.actuatorState?.relayOn ? 'ON' : 'OFF'}</span>

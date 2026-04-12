@@ -49,6 +49,21 @@ function connectMongoDB() {
       console.log('MongoDB connected');
       // Load existing nodes state
       try {
+        const defaultNodes = [
+          { nodeId: 'Main_Building', name: 'Main Building', location: { lat: 22.2520, lng: 84.9010 } },
+          { nodeId: 'CSE_Building', name: 'CSE Building', location: { lat: 22.2515, lng: 84.9020 } },
+          { nodeId: 'Mech_Building', name: 'Mech Building', location: { lat: 22.2525, lng: 84.9030 } },
+          { nodeId: 'ECE_Building', name: 'ECE Building', location: { lat: 22.2510, lng: 84.9040 } },
+          { nodeId: 'LA1', name: 'LA1', location: { lat: 22.2535, lng: 84.9000 } },
+          { nodeId: 'LA2', name: 'LA2', location: { lat: 22.2535, lng: 84.8990 } },
+          { nodeId: 'SD_Hall', name: 'SD Hall', location: { lat: 22.2470, lng: 84.9050 } }
+        ];
+
+        // Pre-seed the NIT Rourkela buildings so they appear on the scalable City Map immediately
+        for (const dn of defaultNodes) {
+          await Node.findOneAndUpdate({ nodeId: dn.nodeId }, { $setOnInsert: dn }, { upsert: true });
+        }
+
         const nodes = await Node.find({});
         nodes.forEach(async (n) => {
           if (n.actuatorState?.mode === 'manual') {
@@ -68,7 +83,7 @@ function connectMongoDB() {
           }
         });
       } catch(err) {
-        console.error('Failed to sync overrides:', err.message);
+        console.error('Failed to sync overrides and seed nodes:', err.message);
       }
     })
     .catch((err) => {
