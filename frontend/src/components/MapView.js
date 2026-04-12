@@ -7,13 +7,13 @@ function MapView({ summary, getRiskColor }) {
   const center = [22.2515, 84.9020]; // Default centered at NIT Rourkela
 
   return (
-    <div className="map-section" style={{ boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '20px', background: '#1c1c1e', borderRadius: '16px' }}>
-      <div className="section-title" style={{ color: '#fff', marginBottom: '15px' }}>City-Level Fire Map (NIT Rourkela)</div>
-      <div style={{ height: '600px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #333' }}>
+    <div className="map-section">
+      <div className="section-title">City-Level Fire Map (NIT Rourkela)</div>
+      <div style={{ height: '600px', borderRadius: '12px', overflow: 'hidden' }}>
         <MapContainer center={center} zoom={16} style={{ height: '100%', width: '100%' }}>
           <TileLayer
             attribution='© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" // Dark theme map to match modern dashboards
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {summary.map(node => {
             if (!node.location?.lat) return null;
