@@ -13,6 +13,22 @@ const { computeFireEstimate, decideActuation } = require('./utils/fireFusion');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const DEFAULT_BUILDINGS = [
+  { nodeId: 'Main_Building', name: 'Main Building', location: { lat: 22.2520, lng: 84.9010 } },
+  { nodeId: 'CSE_Building', name: 'CSE Building', location: { lat: 22.2515, lng: 84.9020 } },
+  { nodeId: 'Mech_Building', name: 'Mech Building', location: { lat: 22.2525, lng: 84.9030 } },
+  { nodeId: 'ECE_Building', name: 'ECE Building', location: { lat: 22.2510, lng: 84.9040 } },
+  { nodeId: 'LA1', name: 'LA1', location: { lat: 22.2535, lng: 84.9000 } },
+  { nodeId: 'LA2', name: 'LA2', location: { lat: 22.2535, lng: 84.8990 } },
+  { nodeId: 'SD_Hall', name: 'SD Hall', location: { lat: 22.2470, lng: 84.9050 } }
+];
+const ALLOWED_NODE_IDS = new Set(DEFAULT_BUILDINGS.map((n) => n.nodeId));
+const LEGACY_NODE_IDS = ['NODE1', 'node1', 'Node1', 'node-1', 'NODE-1'];
+
+function isAllowedNodeId(nodeId) {
+  return ALLOWED_NODE_IDS.has(nodeId);
+}
+
 // Twilio setup
 const twilioClient = (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN)
   ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
@@ -49,22 +65,15 @@ function connectMongoDB() {
       console.log('MongoDB connected');
       // Load existing nodes state
       try {
-        const defaultNodes = [
-          { nodeId: 'Main_Building', name: 'Main Building', location: { lat: 22.2520, lng: 84.9010 } },
-          { nodeId: 'CSE_Building', name: 'CSE Building', location: { lat: 22.2515, lng: 84.9020 } },
-          { nodeId: 'Mech_Building', name: 'Mech Building', location: { lat: 22.2525, lng: 84.9030 } },
-          { nodeId: 'ECE_Building', name: 'ECE Building', location: { lat: 22.2510, lng: 84.9040 } },
-          { nodeId: 'LA1', name: 'LA1', location: { lat: 22.2535, lng: 84.9000 } },
-          { nodeId: 'LA2', name: 'LA2', location: { lat: 22.2535, lng: 84.8990 } },
-          { nodeId: 'SD_Hall', name: 'SD Hall', location: { lat: 22.2470, lng: 84.9050 } }
-        ];
-
         // Pre-seed the NIT Rourkela buildings so they appear on the scalable City Map immediately
-        for (const dn of defaultNodes) {
+        for (const dn of DEFAULT_BUILDINGS) {
           await Node.findOneAndUpdate({ nodeId: dn.nodeId }, { $setOnInsert: dn }, { upsert: true });
         }
 
-        const nodes = await Node.find({});
+        await Node.deleteMany({ nodeId: { $in: LEGACY_NODE_IDS } });
+        await Reading.deleteMany({ nodeId: { $in: LEGACY_NODE_IDS } });
+
+        const nodes = await Node.find({ nodeId: { $in: [...ALLOWED_NODE_IDS] } });
         nodes.forEach(async (n) => {
           if (n.actuatorState?.mode === 'manual') {
             const exp = n.actuatorState.expiresAt ? new Date(n.actuatorState.expiresAt).getTime() : null;
@@ -148,6 +157,7 @@ function publishControl(nodeId, control) {
 
 function normalizePayload(nodeIdFromTopic, raw) {
   const nodeId = raw.nodeId || nodeIdFromTopic;
+  if (!isAllowedNodeId(nodeId)) return null;
   let flameRaw = Array.isArray(raw.flame) ? raw.flame : [];
   let mq2Raw = Array.isArray(raw.mq2) ? raw.mq2 : [];
   let dhtRaw = Array.isArray(raw.dht) ? raw.dht : [];
@@ -232,6 +242,7 @@ mqttClient.on('message', async (topic, message) => {
   }
 
   const normalized = normalizePayload(nodeId, payload);
+    if (!normalized) return;
   const estimate = computeFireEstimate({ 
      ...normalized, 
      history: getNodeCache(normalized.nodeId).all.slice(-10) 
@@ -338,14 +349,14 @@ app.get('/api/health', (req, res) => {
 app.get('/api/nodes', async (req, res) => {
   if (mongoConnected) {
     try {
-      const nodes = await Node.find({});
+      const nodes = await Node.find({ nodeId: { $in: [...ALLOWED_NODE_IDS] } });
       return res.json(nodes);
     } catch (err) {
       console.error('Nodes query failed:', err.message);
     }
   }
 
-  const nodes = Object.keys(memoryCache).map((nodeId) => ({
+  const nodes = Object.keys(memoryCache).filter(isAllowedNodeId).map((nodeId) => ({
     nodeId,
     name: nodeId,
     lastSeen: memoryCache[nodeId].latest?.timestamp,
@@ -359,7 +370,7 @@ app.get('/api/nodes', async (req, res) => {
 app.get('/api/summary', async (req, res) => {
   if (mongoConnected) {
     try {
-      const nodes = await Node.find({});
+      const nodes = await Node.find({ nodeId: { $in: [...ALLOWED_NODE_IDS] } });
       const summary = await Promise.all(nodes.map(async (node) => {
         const latest = await Reading.findOne({ nodeId: node.nodeId }).sort({ timestamp: -1 });
         return {
@@ -380,7 +391,7 @@ app.get('/api/summary', async (req, res) => {
     }
   }
 
-  const summary = Object.keys(memoryCache).map((nodeId) => ({
+  const summary = Object.keys(memoryCache).filter(isAllowedNodeId).map((nodeId) => ({
     nodeId,
     name: nodeId,
     location: null,
@@ -396,6 +407,7 @@ app.get('/api/summary', async (req, res) => {
 
 app.get('/api/nodes/:id/latest', async (req, res) => {
   const nodeId = req.params.id;
+  if (!isAllowedNodeId(nodeId)) return res.status(404).json({ error: 'Unknown building node' });
   if (mongoConnected) {
     try {
       const reading = await Reading.findOne({ nodeId }).sort({ timestamp: -1 });
@@ -412,6 +424,7 @@ app.get('/api/nodes/:id/latest', async (req, res) => {
 
 app.get('/api/nodes/:id/data', async (req, res) => {
   const nodeId = req.params.id;
+  if (!isAllowedNodeId(nodeId)) return res.status(404).json({ error: 'Unknown building node' });
   const range = req.query.range || '24h';
   const rangeMap = { '24h': 24, '7d': 168, '30d': 720 };
   const hours = rangeMap[range] || 24;
@@ -432,6 +445,7 @@ app.get('/api/nodes/:id/data', async (req, res) => {
 });
 
 app.get('/api/nodes/:id/stats', async (req, res) => {
+  if (!isAllowedNodeId(req.params.id)) return res.status(404).json({ error: 'Unknown building node' });
   const range = req.query.range || '7d';
   const rangeMap = { '24h': 24, '7d': 168, '30d': 720 };
   const hours = rangeMap[range] || 168;
@@ -483,6 +497,7 @@ app.get('/api/alerts', async (req, res) => {
     if (!mongoConnected) {
       const rows = [];
       Object.keys(memoryCache).forEach((nodeId) => {
+        if (!isAllowedNodeId(nodeId)) return;
         memoryCache[nodeId].all.forEach((r) => {
           if (Number(r.fireProbability || 0) >= threshold) rows.push(r);
         });
@@ -492,6 +507,7 @@ app.get('/api/alerts', async (req, res) => {
     }
 
     const alerts = await Reading.find({ fireProbability: { $gte: threshold } })
+      .where('nodeId').in([...ALLOWED_NODE_IDS])
       .sort({ timestamp: -1 })
       .limit(50)
       .select('nodeId timestamp fireProbability riskLevel flame mq2 decision acknowledged');
@@ -504,6 +520,7 @@ app.get('/api/alerts', async (req, res) => {
 
 app.post('/api/nodes/:id/settings', async (req, res) => {
   const nodeId = req.params.id;
+  if (!isAllowedNodeId(nodeId)) return res.status(404).json({ error: 'Unknown building node' });
   const { name, lat, lng } = req.body;
   if (!mongoConnected) return res.status(500).json({ error: 'DB not connected' });
 
@@ -538,6 +555,7 @@ app.post('/api/alerts/:id/ack', async (req, res) => {
 
 app.post('/api/nodes/:id/control', async (req, res) => {
   const nodeId = req.params.id;
+  if (!isAllowedNodeId(nodeId)) return res.status(404).json({ error: 'Unknown building node' });
   const relayOn = !!req.body.relayOn;
   const buzzerOn = !!req.body.buzzerOn;
   const mode = req.body.mode === 'manual' ? 'manual' : 'auto';
@@ -600,6 +618,7 @@ app.post('/api/nodes/:id/control', async (req, res) => {
 
 app.get('/api/nodes/:id/control', (req, res) => {
   const nodeId = req.params.id;
+  if (!isAllowedNodeId(nodeId)) return res.status(404).json({ error: 'Unknown building node' });
   const override = manualOverrides[nodeId];
   const state = memoryCache[nodeId]?.actuatorState || null;
 

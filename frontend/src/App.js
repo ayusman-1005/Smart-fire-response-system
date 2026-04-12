@@ -20,6 +20,15 @@ ChartJS.register(
 
 const API = process.env.REACT_APP_API_URL || '/api';
 const POLL_INTERVAL = 8000;
+const LEGACY_NODE_IDS = new Set(['NODE1', 'node1', 'Node1', 'node-1', 'NODE-1']);
+
+function sortNodes(nodes) {
+  return [...nodes].sort((a, b) => {
+    const aName = (a.name || a.nodeId || '').toLowerCase();
+    const bName = (b.name || b.nodeId || '').toLowerCase();
+    return aName.localeCompare(bName);
+  });
+}
 
 function App() {
   const [summary, setSummary] = useState([]);
@@ -38,9 +47,10 @@ function App() {
   const fetchSummary = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/summary`);
-      setSummary(res.data);
-      if (!selectedNode && res.data.length > 0) {
-        setSelectedNode(res.data[0].nodeId);
+      const cleaned = sortNodes((res.data || []).filter((n) => !LEGACY_NODE_IDS.has(n.nodeId)));
+      setSummary(cleaned);
+      if (!selectedNode && cleaned.length > 0) {
+        setSelectedNode(cleaned[0].nodeId);
       }
     } catch (err) {
       console.error('Summary fetch error:', err.message);
@@ -116,6 +126,13 @@ function App() {
     document.body.setAttribute('data-theme', theme);
     localStorage.setItem('dashboardTheme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!summary.length) return;
+    if (!summary.some((n) => n.nodeId === selectedNode)) {
+      setSelectedNode(summary[0].nodeId);
+    }
+  }, [summary, selectedNode]);
 
   const getRiskColor = (riskOrProbability) => {
     if (typeof riskOrProbability === 'number') {
@@ -295,21 +312,25 @@ function App() {
             </section>
 
             <section className="map-preview-section">
-               <MapView summary={summary} getRiskColor={getRiskColor} />
+               <MapView summary={summary} getRiskColor={getRiskColor} height={420} showTitle={false} />
             </section>
 
             {selectedNodeData && (
               <section className="control-panel">
-                <div className="section-title">Manual Override - {selectedNodeData.name || selectedNodeData.nodeId}</div>
-                
-                <div className="coord-editor">
-                  <span>Map Pins Setup:</span>
-                  <label>Lat:</label>
-                  <input className="coord-input" type="number" step="0.0001" value={nodeLat} onChange={e=>setNodeLat(e.target.value)} />
-                  <label>Lng:</label>
-                  <input className="coord-input" type="number" step="0.0001" value={nodeLng} onChange={e=>setNodeLng(e.target.value)} />
-                  <button className="coord-save-btn" onClick={saveCoords}>Update Location</button>
+                <div className="panel-head">
+                  <div className="section-title">Manual Override</div>
+                  <select
+                    className="node-select"
+                    value={selectedNode || ''}
+                    onChange={(e) => setSelectedNode(e.target.value)}
+                  >
+                    {summary.map((n) => (
+                      <option key={n.nodeId} value={n.nodeId}>{n.name || n.nodeId}</option>
+                    ))}
+                  </select>
                 </div>
+
+                <div className="selected-node-tag">Selected Building: {selectedNodeData.name || selectedNodeData.nodeId}</div>
 
                 <div className="control-status">
                   <span className="status-pill">Mode: {selectedNodeData.actuatorState?.mode || 'auto'}</span>
@@ -381,7 +402,35 @@ function App() {
           </>
         )}
 
-        {activeTab === 'map' && <MapView summary={summary} getRiskColor={getRiskColor} />}
+        {activeTab === 'map' && (
+          <>
+            <MapView summary={summary} getRiskColor={getRiskColor} height={620} showTitle={true} />
+            {selectedNodeData && (
+              <section className="control-panel">
+                <div className="panel-head">
+                  <div className="section-title">Map Pins Setup</div>
+                  <select
+                    className="node-select"
+                    value={selectedNode || ''}
+                    onChange={(e) => setSelectedNode(e.target.value)}
+                  >
+                    {summary.map((n) => (
+                      <option key={n.nodeId} value={n.nodeId}>{n.name || n.nodeId}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="selected-node-tag">Edit Location for: {selectedNodeData.name || selectedNodeData.nodeId}</div>
+                <div className="coord-editor">
+                  <label>Lat:</label>
+                  <input className="coord-input" type="number" step="0.0001" value={nodeLat} onChange={e => setNodeLat(e.target.value)} />
+                  <label>Lng:</label>
+                  <input className="coord-input" type="number" step="0.0001" value={nodeLng} onChange={e => setNodeLng(e.target.value)} />
+                  <button className="coord-save-btn" onClick={saveCoords}>Update Location</button>
+                </div>
+              </section>
+            )}
+          </>
+        )}
 
         {activeTab === 'alerts' && <AlertsPanel alerts={alerts} getRiskColor={getRiskColor} API={API} stopAlarm={stopAlarmSound} />}
 

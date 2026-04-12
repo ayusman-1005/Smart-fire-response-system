@@ -3,13 +3,13 @@ import React from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-function MapView({ summary, getRiskColor }) {
+function MapView({ summary, getRiskColor, height = 600, showTitle = true }) {
   const center = [22.2515, 84.9020]; // Default centered at NIT Rourkela
 
   return (
     <div className="map-section">
-      <div className="section-title">City-Level Fire Map (NIT Rourkela)</div>
-      <div style={{ height: '600px', borderRadius: '12px', overflow: 'hidden' }}>
+      {showTitle && <div className="section-title">City-Level Fire Map (NIT Rourkela)</div>}
+      <div style={{ height: `${height}px`, borderRadius: '12px', overflow: 'hidden' }}>
         <MapContainer center={center} zoom={16} style={{ height: '100%', width: '100%' }}>
           <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'

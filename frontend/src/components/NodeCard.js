@@ -47,7 +47,7 @@ function NodeCard({ node, selected, onSelect, riskColor }) {
       <div className="card-metrics">
         <div className="metric">
           <span className="metric-label">Temperature</span>
-          <span className="metric-value">{tempMax} <small>deg C</small></span>
+          <span className="metric-value">{tempMax} <small>{'\u00B0C'}</small></span>
         </div>
         <div className="metric">
           <span className="metric-label">Humidity</span>
