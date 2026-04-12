@@ -17,6 +17,7 @@ const ReadingSchema = new mongoose.Schema({
   dht: [{ temperature: Number, humidity: Number }],
   fireProbability: Number,
   riskLevel: String,
+  acknowledged: { type: Boolean, default: false },
   decision: {
     relayOn: Boolean,
     buzzerOn: Boolean,

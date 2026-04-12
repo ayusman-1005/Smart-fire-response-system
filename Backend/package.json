@@ -16,7 +16,8 @@
     "express": "^4.22.1",
     "mongodb": "^7.1.1",
     "mongoose": "^7.8.9",
-    "mqtt": "^4.3.8"
+    "mqtt": "^4.3.8",
+    "twilio": "^5.13.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

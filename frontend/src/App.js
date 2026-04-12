@@ -57,10 +57,34 @@ function App() {
     try {
       const res = await axios.get(`${API}/alerts?threshold=55`);
       setAlerts(res.data);
+      // Play audible alarm if there's an unacknowledged critical alert
+      const hasCritical = res.data.some(a => a.fireProbability >= 80 && !a.acknowledged);
+      if (hasCritical) {
+         playAlarmSound();
+      }
     } catch (err) {
       console.error('Alerts fetch error:', err.message);
     }
   }, []);
+
+  const playAlarmSound = () => {
+     let audio = document.getElementById('fire-alarm-sound');
+     if (!audio) {
+        audio = new Audio('/alarm.mp3'); // Assuming public/alarm.mp3 exists or standard beep
+        audio.id = 'fire-alarm-sound';
+        audio.loop = true;
+        document.body.appendChild(audio);
+     }
+     audio.play().catch(e => console.warn('Audio play blocked by browser until interacted', e));
+  };
+  
+  const stopAlarmSound = () => {
+      const audio = document.getElementById('fire-alarm-sound');
+      if (audio) {
+         audio.pause();
+         audio.currentTime = 0;
+      }
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -299,7 +323,7 @@ function App() {
 
         {activeTab === 'map' && <MapView summary={summary} getRiskColor={getRiskColor} />}
 
-        {activeTab === 'alerts' && <AlertsPanel alerts={alerts} getRiskColor={getRiskColor} />}
+        {activeTab === 'alerts' && <AlertsPanel alerts={alerts} getRiskColor={getRiskColor} API={API} stopAlarm={stopAlarmSound} />}
 
         {activeTab === 'stats' && (
           <StatsPanel

@@ -1,7 +1,20 @@
 // src/components/AlertsPanel.js
-import React from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
 
-function AlertsPanel({ alerts, getRiskColor }) {
+function AlertsPanel({ alerts, getRiskColor, API, stopAlarm }) {
+  const [acking, setAcking] = useState({});
+
+  const handleAck = async (alertId) => {
+    setAcking(p => ({ ...p, [alertId]: true }));
+    try {
+      await axios.post(`${API}/alerts/${alertId}/ack`);
+      stopAlarm();
+    } catch(err) {
+      console.error('Failed to ack', err);
+    }
+  };
+
   return (
     <div className="alerts-section">
       <div className="section-title">Fire Alerts - Threshold Breaches</div>
@@ -14,14 +27,14 @@ function AlertsPanel({ alerts, getRiskColor }) {
               <th>Node</th>
               <th>Probability</th>
               <th>Risk</th>
-              <th>Flame Hits</th>
               <th>Action</th>
+              <th>Status</th>
               <th>Time</th>
             </tr>
           </thead>
           <tbody>
             {alerts.map((a, i) => (
-              <tr key={i}>
+              <tr key={React.useId()}>
                 <td><strong>{a.nodeId}</strong></td>
                 <td>
                   <span
@@ -35,8 +48,20 @@ function AlertsPanel({ alerts, getRiskColor }) {
                   </span>
                 </td>
                 <td>{a.riskLevel}</td>
-                <td>{Array.isArray(a.flame) ? a.flame.filter(Boolean).length : 0}/5</td>
                 <td>{a.decision?.relayOn || a.decision?.buzzerOn ? 'AUTO ACTUATED' : 'NO ACTION'}</td>
+                <td>
+                  {a.acknowledged ? (
+                    <span style={{color: '#32d74b'}}>Acknowledged</span>
+                  ) : (
+                    <button 
+                       className="action-btn warn" 
+                       style={{padding: '4px 8px'}} 
+                       disabled={acking[a._id]}
+                       onClick={() => handleAck(a._id)}>
+                       Acknowledge
+                    </button>
+                  )}
+                </td>
                 <td>{new Date(a.timestamp).toLocaleString()}</td>
               </tr>
             ))}

@@ -7,10 +7,19 @@ const mqtt = require('mqtt');
 
 const Reading = require('./models/Reading');
 const Node = require('./models/Node');
+const twilio = require('twilio');
 const { computeFireEstimate, decideActuation } = require('./utils/fireFusion');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Twilio setup
+const twilioClient = (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN)
+  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  : null;
+
+const TWILIO_FROM = process.env.TWILIO_FROM_PHONE;
+const TWILIO_TO = process.env.TWILIO_TO_PHONE;
 
 const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080')
   .split(',')
@@ -35,9 +44,32 @@ function connectMongoDB() {
     retryWrites: true,
     w: 'majority'
   })
-    .then(() => {
+    .then(async () => {
       mongoConnected = true;
       console.log('MongoDB connected');
+      // Load existing nodes state
+      try {
+        const nodes = await Node.find({});
+        nodes.forEach(async (n) => {
+          if (n.actuatorState?.mode === 'manual') {
+            const exp = n.actuatorState.expiresAt ? new Date(n.actuatorState.expiresAt).getTime() : null;
+            if (exp && Date.now() > exp) {
+              n.actuatorState.mode = 'auto';
+              n.actuatorState.relayOn = false;
+              n.actuatorState.buzzerOn = false;
+              await n.save();
+            } else {
+              manualOverrides[n.nodeId] = {
+                relayOn: n.actuatorState.relayOn,
+                buzzerOn: n.actuatorState.buzzerOn,
+                expiresAt: exp
+              };
+            }
+          }
+        });
+      } catch(err) {
+        console.error('Failed to sync overrides:', err.message);
+      }
     })
     .catch((err) => {
       mongoConnected = false;
@@ -138,6 +170,15 @@ function normalizePayload(nodeIdFromTopic, raw) {
     humidity: Number(item?.humidity || 0)
   }));
 
+  // Update Node Location if payload includes lat/lng (for dynamic nodes)
+  if (raw.lat !== undefined && raw.lng !== undefined && mongoConnected) {
+    Node.findOneAndUpdate(
+       { nodeId },
+       { 'location.lat': Number(raw.lat), 'location.lng': Number(raw.lng) },
+       { upsert: true }
+    ).catch(()=>{});
+  }
+
   return { nodeId, flame, mq2, dht };
 }
 
@@ -176,7 +217,10 @@ mqttClient.on('message', async (topic, message) => {
   }
 
   const normalized = normalizePayload(nodeId, payload);
-  const estimate = computeFireEstimate(normalized);
+  const estimate = computeFireEstimate({ 
+     ...normalized, 
+     history: getNodeCache(normalized.nodeId).all.slice(-10) 
+  });
 
   let decision;
   if (isManualActive(normalized.nodeId)) {
@@ -222,7 +266,24 @@ mqttClient.on('message', async (topic, message) => {
 
   if (decision.relayOn || decision.buzzerOn || estimate.riskLevel === 'CRITICAL') {
     console.warn(`[ALERT] ${normalized.nodeId} probability=${estimate.fireProbability}% risk=${estimate.riskLevel}`);
-    // TODO: integrate Twilio/SMTP for phone+email emergency notifications.
+    
+    if (estimate.riskLevel === 'CRITICAL' && twilioClient && TWILIO_FROM && TWILIO_TO) {
+      if (!nodeCache.lastSmsSent || Date.now() - nodeCache.lastSmsSent > 10 * 60 * 1000) {
+        nodeCache.lastSmsSent = Date.now();
+        twilioClient.messages.create({
+           body: `[URGENT] CRITICAL Fire Alert from Node ${normalized.nodeId}. Probability: ${estimate.fireProbability}%. Action taken: Pump ${decision.relayOn ? 'ON' : 'OFF'}, Siren ${decision.buzzerOn ? 'ON' : 'OFF'}. Please check Dashboard immediately! Location: NIT Rourkela (Default).`,
+           from: TWILIO_FROM,
+           to: TWILIO_TO
+        }).catch(e => console.error('Twilio SMS Error:', e.message));
+
+        // Let's also do a call
+        twilioClient.calls.create({
+          twiml: `<Response><Say>Critical fire alert at ${normalized.nodeId}. Please check the emergency dashboard.</Say></Response>`,
+          to: TWILIO_TO,
+          from: TWILIO_FROM
+        }).catch(e => console.error('Twilio Call Error:', e.message));
+      }
+    }
   }
 
   if (mongoConnected) {
@@ -418,11 +479,45 @@ app.get('/api/alerts', async (req, res) => {
     const alerts = await Reading.find({ fireProbability: { $gte: threshold } })
       .sort({ timestamp: -1 })
       .limit(50)
-      .select('nodeId timestamp fireProbability riskLevel flame mq2 decision');
+      .select('nodeId timestamp fireProbability riskLevel flame mq2 decision acknowledged');
 
     res.json(alerts);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/nodes/:id/settings', async (req, res) => {
+  const nodeId = req.params.id;
+  const { name, lat, lng } = req.body;
+  if (!mongoConnected) return res.status(500).json({ error: 'DB not connected' });
+
+  try {
+     const n = await Node.findOneAndUpdate(
+        { nodeId },
+        { 
+          name: name,
+          'location.lat': lat,
+          'location.lng': lng
+        },
+        { upsert: true, new: true }
+     );
+     res.json(n);
+  } catch(err) {
+     res.status(500).json({ error: err.message });
+  }
+});
+
+// Acknowledge Alert Endpoints
+app.post('/api/alerts/:id/ack', async (req, res) => {
+  const { id } = req.params;
+  if(!mongoConnected) return res.json({ ok:true });
+
+  try {
+     await Reading.findByIdAndUpdate(id, { acknowledged: true });
+     res.json({ ok: true });
+  } catch(err) {
+     res.status(500).json({ error: err.message });
   }
 });
 
@@ -473,6 +568,7 @@ app.post('/api/nodes/:id/control', async (req, res) => {
             relayOn: command.relayOn,
             buzzerOn: command.buzzerOn,
             mode: command.mode,
+            expiresAt: manualOverrides[nodeId]?.expiresAt || null,
             updatedAt: new Date(),
             source: command.source
           }

@@ -20,6 +20,7 @@ const NodeSchema = new mongoose.Schema({
     relayOn: { type: Boolean, default: false },
     buzzerOn: { type: Boolean, default: false },
     mode: { type: String, default: 'auto' },
+    expiresAt: Date,
     updatedAt: Date,
     source: String
   }
