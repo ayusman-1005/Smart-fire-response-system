@@ -6,14 +6,14 @@
 #define NODE_ID "SD_Hall"
 
 // WiFi
-#define WIFI_SSID "Realme 8i"
-#define WIFI_PASSWORD "2444666668888888"
+#define WIFI_SSID "wifi name"
+#define WIFI_PASSWORD "pass"
 
 // MQTT (HiveMQ Cloud)
-#define MQTT_HOST "d1df7b2e9a394f44a7b6827a5ae0920c.s1.eu.hivemq.cloud"
+#define MQTT_HOST "xxxxxxx.s1.eu.hivemq.cloud"
 #define MQTT_PORT 8883
-#define MQTT_USER "ayusman"
-#define MQTT_PASS "Youshouldnotseethis1"
+#define MQTT_USER "user"
+#define MQTT_PASS "pass"
 
 // UART
 #define UART_RX_PIN 16
