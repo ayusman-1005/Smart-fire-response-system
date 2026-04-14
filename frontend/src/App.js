@@ -78,6 +78,15 @@ function App() {
       }
   };
 
+  const handleAlertAcknowledged = useCallback((alertId) => {
+    setAlerts((prev) => {
+      const updated = prev.map((a) => (a._id === alertId ? { ...a, acknowledged: true } : a));
+      const hasCriticalPending = updated.some((a) => a.fireProbability >= 80 && !a.acknowledged);
+      if (!hasCriticalPending) stopAlarmSound();
+      return updated;
+    });
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       await fetchSummary();
@@ -360,7 +369,15 @@ function App() {
 
         {activeTab === 'graphs' && <GraphsPanel nodes={summary} API={API} />}
 
-        {activeTab === 'alerts' && <AlertsPanel alerts={alerts} getRiskColor={getRiskColor} API={API} stopAlarm={stopAlarmSound} />}
+        {activeTab === 'alerts' && (
+          <AlertsPanel
+            alerts={alerts}
+            getRiskColor={getRiskColor}
+            API={API}
+            stopAlarm={stopAlarmSound}
+            onAcknowledge={handleAlertAcknowledged}
+          />
+        )}
 
         {activeTab === 'stats' && (
           <StatsPanel

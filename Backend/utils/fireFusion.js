@@ -64,8 +64,10 @@ function computeFireEstimate({ flame, mq2, dht, history }) {
 
 function decideActuation({ fireProbability, riskLevel, flame }) {
   const autoThreshold = Number(process.env.FIRE_AUTO_THRESHOLD || 70);
-  const flameHits = Array.isArray(flame) ? flame.filter(Boolean).length : 0;
-  const trigger = fireProbability >= autoThreshold || riskLevel === 'CRITICAL' || flameHits >= 3;
+  const flameList = Array.isArray(flame) ? flame : [];
+  const flameHits = flameList.filter(Boolean).length;
+  const allFlamesDetected = flameList.length > 0 && flameList.every((v) => Boolean(v));
+  const trigger = allFlamesDetected || fireProbability >= autoThreshold || riskLevel === 'CRITICAL' || flameHits >= 3;
 
   return {
     relayOn: trigger,

@@ -2,16 +2,22 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-function AlertsPanel({ alerts, getRiskColor, API, stopAlarm }) {
+function AlertsPanel({ alerts, getRiskColor, API, stopAlarm, onAcknowledge }) {
   const [acking, setAcking] = useState({});
 
   const handleAck = async (alertId) => {
     setAcking(p => ({ ...p, [alertId]: true }));
     try {
       await axios.post(`${API}/alerts/${alertId}/ack`);
-      stopAlarm();
+      if (typeof onAcknowledge === 'function') {
+        onAcknowledge(alertId);
+      } else {
+        stopAlarm();
+      }
     } catch(err) {
       console.error('Failed to ack', err);
+    } finally {
+      setAcking(p => ({ ...p, [alertId]: false }));
     }
   };
 
@@ -34,7 +40,7 @@ function AlertsPanel({ alerts, getRiskColor, API, stopAlarm }) {
           </thead>
           <tbody>
             {alerts.map((a, i) => (
-              <tr key={React.useId()}>
+              <tr key={a._id || `${a.nodeId}-${a.timestamp}-${i}`}>
                 <td><strong>{a.nodeId}</strong></td>
                 <td>
                   <span

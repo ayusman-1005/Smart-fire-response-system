@@ -247,6 +247,7 @@ mqttClient.on('message', async (topic, message) => {
      ...normalized, 
      history: getNodeCache(normalized.nodeId).all.slice(-10) 
   });
+    const allFlamesDetected = Array.isArray(normalized.flame) && normalized.flame.length > 0 && normalized.flame.every((v) => Boolean(v));
 
   let decision;
   if (isManualActive(normalized.nodeId)) {
@@ -293,7 +294,7 @@ mqttClient.on('message', async (topic, message) => {
   if (decision.relayOn || decision.buzzerOn || estimate.riskLevel === 'CRITICAL') {
     console.warn(`[ALERT] ${normalized.nodeId} probability=${estimate.fireProbability}% risk=${estimate.riskLevel}`);
     
-    if (estimate.riskLevel === 'CRITICAL' && twilioClient && TWILIO_FROM && TWILIO_TO) {
+    if ((estimate.riskLevel === 'CRITICAL' || allFlamesDetected) && twilioClient && TWILIO_FROM && TWILIO_TO) {
       if (!nodeCache.lastSmsSent || Date.now() - nodeCache.lastSmsSent > 10 * 60 * 1000) {
         nodeCache.lastSmsSent = Date.now();
         twilioClient.messages.create({
