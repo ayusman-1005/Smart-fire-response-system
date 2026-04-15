@@ -1,5 +1,9 @@
 # Smart Fire Response System
 
+## Quick Links
+- Live Deployment: https://smart-fire-response-system.vercel.app/
+- Demo Video: https://youtu.be/5AuoG7aDiLo
+
 ## 1. Project Overview
 Smart Fire Response System is an IoT-based campus safety project for real-time fire monitoring and response. The system collects data from building-level sensor nodes, computes fire risk on the backend, and displays live status on a centralized dashboard.
 
@@ -103,22 +107,14 @@ npm start
 
 Frontend default URL: http://localhost:3000
 
-## 8. Deployment
-Frontend is deployed at:
-https://smart-fire-response-system.vercel.app/
-
-Note:
-- The deployed frontend must point to a reachable backend API.
-- If backend is hosted separately, ensure REACT_APP_API_URL is configured correctly in Vercel environment settings.
-
-## 9. Testing Notes
+## 8. Testing Notes
 - Send sample MQTT payloads for each building node.
 - Verify card state changes in dashboard.
 - Trigger high flame/gas/temperature to validate emergency response.
 - Confirm acknowledgement behavior in alerts page.
 - If Twilio is configured, verify SMS/call on critical scenarios.
 
-## 10. Current Scope and Limitations
+## 9. Current Scope and Limitations
 - This is a student project intended for controlled testing and demo environments.
 - Polling-based UI updates are used instead of persistent websocket streams.
 - Sensor values and thresholds may need calibration for production deployment.
