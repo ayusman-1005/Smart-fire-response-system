@@ -104,7 +104,6 @@ cd frontend
 npm install
 npm start
 ```
-
 Frontend default URL: http://localhost:3000
 
 ## 8. Testing Notes
